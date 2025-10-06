@@ -241,7 +241,10 @@ FAQ,製品保証,"すべての製品には1年間のメーカー保証が付い�
             const data = parseCSV(knowledgeCSVData);
             systemPrompt = generateSystemPromptFromCSV(data);
             
-            addMessageToChat('ai', 'こんにちは！Example Inc.のAIサポートです。ご用件をお聞かせください。');
+            const initialAiMessage = 'こんにちは！Example Inc.のAIサポートです。ご用件をお聞かせください。';
+            addMessageToChat('ai', initialAiMessage);
+            // AIの最初の挨拶を会話履歴に追加します
+            conversationHistory.push({ role: 'ai', message: initialAiMessage });
         } catch (error) {
             console.error("Failed to load knowledge base from embedded data:", error);
             addMessageToChat('ai', '申し訳ありません、現在サポート情報を読み込めません。管理者にお問い合わせください。');
