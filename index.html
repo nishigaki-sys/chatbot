@@ -267,7 +267,13 @@ FAQ,製品保証,"すべての製品には1年間のメーカー保証が付い�
         }
 
         try {
-            const aiResponse = await callGeminiApiWithBackoff(message);
+            // APIに送信するために会話履歴をフォーマットします
+            const formattedHistory = conversationHistory.map(item => ({
+                role: item.role === 'ai' ? 'model' : 'user', // 'ai' を 'model' にマッピング
+                parts: [{ text: item.message }]
+            }));
+
+            const aiResponse = await callGeminiApiWithBackoff(formattedHistory);
             addMessageToChat('ai', aiResponse);
             conversationHistory.push({ role: 'ai', message: aiResponse });
         } catch (error) {
@@ -281,10 +287,10 @@ FAQ,製品保証,"すべての製品には1年間のメーカー保証が付い�
 
     /**
      * Gemini APIをExponential Backoff付きで呼び出す
-     * @param {string} userQuery ユーザーからの質問
+     * @param {Array<Object>} formattedHistory フォーマットされた会話履歴
      * @returns {Promise<string>} AIからの応答テキスト
      */
-    async function callGeminiApiWithBackoff(userQuery) {
+    async function callGeminiApiWithBackoff(formattedHistory) {
         let retries = 3;
         let delay = 1000;
 
@@ -294,7 +300,7 @@ FAQ,製品保証,"すべての製品には1年間のメーカー保証が付い�
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: userQuery }] }],
+                        contents: formattedHistory, // ユーザーからの単一の質問ではなく、完全な履歴を送信します
                         systemInstruction: { parts: [{ text: systemPrompt }] },
                     }),
                 });
