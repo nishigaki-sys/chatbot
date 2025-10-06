@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Customer Support Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chat-bubble-user {
+            background-color: #3B82F6; /* blue-500 */
+            color: white;
+        }
+        .chat-bubble-ai {
+            background-color: #E5E7EB; /* gray-200 */
+            color: #1F2937; /* gray-800 */
+        }
+        .chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .chat-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .chat-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        /* Typing indicator animation */
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            background-color: #9E9E9E;
+            border-radius: 50%;
+            display: inline-block;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+        .suggested-question-btn {
+            padding: 8px 16px;
+            background-color: #F3F4F6; /* gray-100 */
+            border: 1px solid #D1D5DB; /* gray-300 */
+            border-radius: 9999px; /* rounded-full */
+            font-size: 0.875rem; /* text-sm */
+            color: #374151; /* gray-700 */
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .suggested-question-btn:hover {
+            background-color: #E5E7EB; /* gray-200 */
+            color: #1F2937; /* gray-800 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen md:flex md:items-center md:justify-center">
+
+    <div class="w-full h-full flex flex-col bg-white md:max-w-2xl md:h-[90vh] md:max-h-[700px] md:rounded-lg md:shadow-xl">
+        <!-- Header -->
+        <div class="bg-blue-600 text-white p-4 md:rounded-t-lg flex items-center shadow-md flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mr-3" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clip-rule="evenodd" />
+            </svg>
+            <div>
+                <h1 class="text-lg md:text-xl font-bold">AIカスタマーサポート</h1>
+                <p class="text-sm opacity-90">ご不明な点はお気軽にご質問ください</p>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div id="chat-container" class="flex-1 p-4 md:p-6 overflow-y-auto chat-container">
+            <!-- Messages will be appended here -->
+        </div>
+
+        <!-- Suggested Questions -->
+        <div id="suggested-questions" class="p-3 md:p-4 border-t border-gray-200 flex-shrink-0">
+            <p class="text-sm text-gray-600 mb-2">よくあるご質問の例：</p>
+            <div class="flex flex-wrap gap-2">
+                <button class="suggested-question-btn">営業時間を教えて</button>
+                <button class="suggested-question-btn">製品の返品はできますか？</button>
+                <button class="suggested-question-btn">送料はいくらですか？</button>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="border-t border-gray-200 p-3 md:p-4 bg-gray-50 md:rounded-b-lg flex-shrink-0">
+            <div class="flex items-center space-x-3">
+                <input type="text" id="user-input" placeholder="メッセージを入力..." class="flex-1 border-gray-300 rounded-full py-3 px-5 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" autocomplete="off">
+                <button id="send-btn" class="bg-blue-600 text-white rounded-full p-3 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:bg-blue-300 disabled:cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const chatContainer = document.getElementById('chat-container');
+    const userInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const suggestedQuestionsContainer = document.getElementById('suggested-questions');
+
+    // Gemini API settings
+    const apiKey = ""; // APIキーは空のままにします。Canvas環境で自動的に設定されます。
+    const model = 'gemini-2.5-flash-preview-05-20';
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    
+    // AIの知識（システムプロンプト）
+    let systemPrompt = '';
+
+    // チャット履歴を保持する配列
+    let conversationHistory = [];
+
+    // --- ここにCSVデータを直接埋め込みます ---
+    // AIの知識を更新するには、この部分を編集してください。
+    const knowledgeCSVData = `type,key,value
+INFO,企業名,"Example Inc."
+INFO,事業内容,"高品質なガジェットやアクセサリーのオンライン販売"
+INFO,営業時間,"年中無休、24時間対応 (お問い合わせへの返信は平日午前9時から午後6時の間に行われます)"
+INFO,所在地,"(非公開) オンラインストアのみ"
+INFO,ウェブサイト,"www.example.com"
+FAQ,送料について,"日本国内は全品送料無料です。\\n海外発送の場合、地域によって送料が異なります。チェックアウト時にご確認ください。"
+FAQ,返品・交換について,"商品到着後30日以内であれば、未使用品に限り返品・交換が可能です。\\n返品をご希望の場合は、ウェブサイトの「お問い合わせ」フォームからご連絡ください。\\nお客様都合による返品の場合、返送料はお客様のご負担となります。"
+FAQ,支払い方法,"クレジットカード (Visa, MasterCard, American Express)\\nPayPal\\nApple Pay / Google Pay"
+FAQ,製品保証,"すべての製品には1年間のメーカー保証が付いています。\\n保証期間内に通常の使用で故障した場合は、無償で修理または交換いたします。"
+`;
+    // --- CSVデータの埋め込みここまで ---
+
+
+    // イベントリスナー
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    suggestedQuestionsContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('suggested-question-btn')) {
+            userInput.value = e.target.textContent;
+            sendMessage();
+            suggestedQuestionsContainer.style.display = 'none';
+        }
+    });
+    
+    /**
+     * CSVテキストを解析してオブジェクトの配列に変換する
+     * @param {string} csvText - 解析するCSVの文字列
+     * @returns {Array<Object>}
+     */
+    function parseCSV(csvText) {
+        const lines = csvText.trim().split('\n');
+        if (lines.length < 2) return [];
+
+        const headers = lines[0].split(',').map(h => h.trim());
+        const data = lines.slice(1).map(line => {
+             // ダブルクォートで囲まれたフィールドを考慮したシンプルなCSVパーサー
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+            for (const char of line) {
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    values.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            values.push(current);
+
+            const entry = {};
+            headers.forEach((header, index) => {
+                let value = (values[index] || '').trim();
+                // 前後のダブルクォートを削除
+                if (value.startsWith('"') && value.endsWith('"')) {
+                    value = value.slice(1, -1);
+                }
+                entry[header] = value;
+            });
+            return entry;
+        });
+        return data;
+    }
+
+    /**
+     * CSVデータからシステムプロンプトを生成する
+     * @param {Array<Object>} data - parseCSVから返されたデータ
+     * @returns {string}
+     */
+    function generateSystemPromptFromCSV(data) {
+        const companyInfo = data.filter(d => d.type === 'INFO');
+        const faqs = data.filter(d => d.type === 'FAQ');
+
+        let prompt = `あなたは「Example Inc.」という企業の、非常に優秀で親切なAIカスタマーサポート担当です。
+あなたの役割は、お客様からのお問い合わせに、以下の企業情報に基づいて正確かつ丁寧に回答することです。
+常にプロフェッショナルで、友好的な口調を保ってください。
+
+### 企業情報 ###
+`;
+        companyInfo.forEach(info => {
+            prompt += `- **${info.key}**: ${info.value}\n`;
+        });
+
+        prompt += `\n### よくある質問 (FAQ) ###\n`;
+        faqs.forEach(faq => {
+            // value内の改行をリスト形式に変換
+            const answer = faq.value.replace(/\\n/g, '\n  - ');
+            prompt += `- **${faq.key}**: \n  - ${answer}\n`;
+        });
+
+        prompt += `
+### 回答時のルール ###
+1. 上記の情報にない質問をされた場合は、「申し訳ありませんが、その情報については分かりかねます。ウェブサイトのお問い合わせフォームから直接お問い合わせいただけますでしょうか。」と回答してください。
+2. 個人的な意見や、上記情報に基づかない推測で回答しないでください。
+3. 簡潔で分かりやすい言葉を使ってください。
+4. お客様の問題を解決することを最優先に考えてください。
+`;
+        return prompt;
+    }
+
+    // ページ読み込み時に埋め込みデータから知識を読み込む
+    window.onload = () => {
+        try {
+            const data = parseCSV(knowledgeCSVData);
+            systemPrompt = generateSystemPromptFromCSV(data);
+            
+            addMessageToChat('ai', 'こんにちは！Example Inc.のAIサポートです。ご用件をお聞かせください。');
+        } catch (error) {
+            console.error("Failed to load knowledge base from embedded data:", error);
+            addMessageToChat('ai', '申し訳ありません、現在サポート情報を読み込めません。管理者にお問い合わせください。');
+            toggleInput(false); // エラー時は入力を無効化
+        }
+    };
+
+
+    /**
+     * ユーザーからのメッセージを送信する
+     */
+    async function sendMessage() {
+        const message = userInput.value.trim();
+        if (!message || !systemPrompt) return;
+
+        addMessageToChat('user', message);
+        conversationHistory.push({ role: 'user', message });
+        userInput.value = '';
+        toggleInput(false);
+        showTypingIndicator();
+        if (suggestedQuestionsContainer.style.display !== 'none') {
+            suggestedQuestionsContainer.style.display = 'none';
+        }
+
+        try {
+            const aiResponse = await callGeminiApiWithBackoff(message);
+            addMessageToChat('ai', aiResponse);
+            conversationHistory.push({ role: 'ai', message: aiResponse });
+        } catch (error) {
+            console.error('Error calling Gemini API:', error);
+            addMessageToChat('ai', '申し訳ありません、エラーが発生しました。しばらくしてからもう一度お試しください。');
+        } finally {
+            hideTypingIndicator();
+            toggleInput(true);
+        }
+    }
+
+    /**
+     * Gemini APIをExponential Backoff付きで呼び出す
+     * @param {string} userQuery ユーザーからの質問
+     * @returns {Promise<string>} AIからの応答テキスト
+     */
+    async function callGeminiApiWithBackoff(userQuery) {
+        let retries = 3;
+        let delay = 1000;
+
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userQuery }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API request failed with status ${response.status}`);
+                }
+                
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    return candidate.content.parts[0].text;
+                } else {
+                    console.error('Unexpected API response structure:', result);
+                    throw new Error('Invalid response structure from Gemini API.');
+                }
+            } catch (error) {
+                console.warn(`Attempt ${i + 1} failed. Retrying in ${delay}ms...`);
+                if (i < retries - 1) {
+                    await new Promise(res => setTimeout(res, delay));
+                    delay *= 2;
+                } else {
+                    throw error;
+                }
+            }
+        }
+        throw new Error('Failed to get a response from Gemini API after multiple retries.');
+    }
+
+    /**
+     * チャットUIにメッセージを追加する
+     * @param {string} sender 'user' または 'ai'
+     * @param {string} message 表示するメッセージテキスト
+     */
+    function addMessageToChat(sender, message) {
+        const messageWrapper = document.createElement('div');
+        messageWrapper.className = `flex mb-4 ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+        
+        const messageBubble = document.createElement('div');
+        messageBubble.className = `rounded-2xl py-2 px-4 max-w-[85%] md:max-w-md ${sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai shadow'}`;
+        
+        messageBubble.innerHTML = message.replace(/\n/g, '<br>');
+
+        messageWrapper.appendChild(messageBubble);
+        chatContainer.appendChild(messageWrapper);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    /**
+     * 入力フィールドと送信ボタンの有効/無効を切り替える
+     * @param {boolean} enabled 有効にする場合はtrue
+     */
+    function toggleInput(enabled) {
+        userInput.disabled = !enabled;
+        sendBtn.disabled = !enabled;
+        if (enabled) {
+            userInput.focus();
+        }
+    }
+
+    /**
+     * AIが考え中であることを示すタイピングインジケーターを表示する
+     */
+    function showTypingIndicator() {
+        const indicator = document.createElement('div');
+        indicator.id = 'typing-indicator';
+        indicator.className = 'flex justify-start mb-4';
+        indicator.innerHTML = `
+            <div class="chat-bubble-ai shadow rounded-2xl py-3 px-4">
+                <div class="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        `;
+        chatContainer.appendChild(indicator);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    /**
+     * タイピングインジケーターを非表示にする
+     */
+    function hideTypingIndicator() {
+        const indicator = document.getElementById('typing-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+</script>
+</body>
+</html>
+
